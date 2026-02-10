@@ -1,0 +1,32 @@
+{
+  "name": "m365-graph-cli",
+  "version": "1.0.0",
+  "description": "Microsoft 365 Graph API CLI for OpenClaw integration",
+  "main": "m365-cli.js",
+  "type": "module",
+  "bin": {
+    "m365": "./m365-cli.js"
+  },
+  "scripts": {
+    "start": "node m365-cli.js",
+    "calendar": "node m365-cli.js calendar --today",
+    "calendar:tomorrow": "node m365-cli.js calendar --tomorrow",
+    "email": "node m365-cli.js email",
+    "email:unread": "node m365-cli.js email --unread"
+  },
+  "keywords": [
+    "microsoft",
+    "graph",
+    "api",
+    "outlook",
+    "calendar",
+    "email",
+    "cli",
+    "openclaw"
+  ],
+  "author": "Darren Furr",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
