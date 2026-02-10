@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node m365-cli.js",
+    "auth": "node auth.js",
     "calendar": "node m365-cli.js calendar --today",
     "calendar:tomorrow": "node m365-cli.js calendar --tomorrow",
     "email": "node m365-cli.js email",

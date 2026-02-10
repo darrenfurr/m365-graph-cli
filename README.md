@@ -39,9 +39,41 @@ export MS365_MCP_CLIENT_SECRET="your-client-secret"
 
 ### 3. Initial authentication
 
-On first run, you'll need a valid refresh token. Either:
-- Copy an existing token cache from another auth flow
-- Use device code flow to bootstrap (one-time interactive)
+Run the device code auth flow:
+
+```bash
+node auth.js
+```
+
+This will:
+1. Display a code and URL
+2. Open https://microsoft.com/devicelogin in your browser
+3. Enter the code and sign in with your Microsoft account
+4. Tokens are automatically saved to `.m365-token-cache.json`
+
+Example output:
+```
+🔐 Starting Microsoft Device Code Authentication
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 To sign in, use a web browser to open:
+
+   https://microsoft.com/devicelogin
+
+   And enter the code: XXXXXXXXX
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏳ Waiting for authentication (expires in 15 minutes)...
+
+✅ Authentication successful!
+
+👤 Signed in as: Your Name
+📧 Email: you@domain.com
+
+💾 Tokens saved to: .m365-token-cache.json
+```
 
 Token cache location: `./.m365-token-cache.json`
 
