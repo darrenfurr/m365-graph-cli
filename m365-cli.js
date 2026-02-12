@@ -13,13 +13,16 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const msal = require('@azure/msal-node');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Config from environment
 const TENANT_ID = process.env.MS365_MCP_TENANT_ID;
 const CLIENT_ID = process.env.MS365_MCP_CLIENT_ID;
-const CLIENT_SECRET = process.env.MS365_MCP_CLIENT_SECRET;
 
 // Token cache paths
 const TOKEN_CACHE_PATHS = [
@@ -54,99 +57,53 @@ function saveCache(cache) {
   fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2));
 }
 
-function getAccessTokenFromCache(cache) {
-  if (!cache?.AccessToken) return null;
-  
-  for (const key of Object.keys(cache.AccessToken)) {
-    const token = cache.AccessToken[key];
-    const expiresOn = parseInt(token.expires_on) * 1000;
-    
-    // Valid for at least 5 minutes
-    if (expiresOn > Date.now() + 300000) {
-      return token.secret;
-    }
-  }
-  return null;
-}
-
-function getRefreshToken(cache) {
-  if (!cache?.RefreshToken) return null;
-  
-  for (const key of Object.keys(cache.RefreshToken)) {
-    return cache.RefreshToken[key].secret;
-  }
-  return null;
-}
-
-async function refreshAccessToken(refreshToken) {
-  const tokenUrl = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
-  
-  const body = new URLSearchParams({
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    scope: 'https://graph.microsoft.com/.default offline_access',
-  });
-
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Token refresh failed: ${error}`);
-  }
-
-  return response.json();
-}
-
 async function getAccessToken() {
-  const cache = loadCache();
+  const cachePath = findTokenCache();
   
-  // Try cached access token first
-  const cachedToken = getAccessTokenFromCache(cache);
-  if (cachedToken) {
-    return cachedToken;
+  if (!fs.existsSync(cachePath)) {
+    throw new Error('No token cache found. Run: node msal-auth.mjs');
   }
 
-  // Try refresh token
-  const refreshToken = getRefreshToken(cache);
-  if (refreshToken) {
-    console.error('🔄 Refreshing access token...');
-    const tokens = await refreshAccessToken(refreshToken);
-    
-    // Update cache with new tokens
-    const newCache = cache || { AccessToken: {}, RefreshToken: {} };
-    const now = Math.floor(Date.now() / 1000);
-    const expiresOn = now + tokens.expires_in;
-    
-    // Store new access token
-    const tokenKey = `${TENANT_ID}-accesstoken-${CLIENT_ID}`;
-    newCache.AccessToken = newCache.AccessToken || {};
-    newCache.AccessToken[tokenKey] = {
-      secret: tokens.access_token,
-      expires_on: expiresOn.toString(),
-      cached_at: now.toString(),
-    };
-    
-    // Store new refresh token if provided
-    if (tokens.refresh_token) {
-      const refreshKey = `${TENANT_ID}-refreshtoken-${CLIENT_ID}`;
-      newCache.RefreshToken = newCache.RefreshToken || {};
-      newCache.RefreshToken[refreshKey] = {
-        secret: tokens.refresh_token,
-      };
-    }
-    
-    saveCache(newCache);
-    console.error('✅ Token refreshed');
-    return tokens.access_token;
+  const cacheData = fs.readFileSync(cachePath, 'utf-8');
+  
+  // Create MSAL client with cache
+  const pca = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+    },
+    cache: {
+      cachePlugin: {
+        beforeCacheAccess: async (context) => {
+          context.tokenCache.deserialize(cacheData);
+        },
+        afterCacheAccess: async (context) => {
+          if (context.cacheHasChanged) {
+            fs.writeFileSync(cachePath, context.tokenCache.serialize());
+          }
+        },
+      },
+    },
+  });
+
+  // Get accounts from cache
+  const accounts = await pca.getTokenCache().getAllAccounts();
+  if (accounts.length === 0) {
+    throw new Error('No account found. Run: node msal-auth.mjs');
   }
 
-  throw new Error('No valid token or refresh token. Run interactive auth first.');
+  try {
+    // Silent token acquisition (auto-refreshes using MSAL)
+    const response = await pca.acquireTokenSilent({
+      account: accounts[0],
+      scopes: ['Calendars.Read', 'Mail.Read', 'Mail.ReadWrite'],
+    });
+
+    return response.accessToken;
+  } catch (error) {
+    // If silent acquisition fails, need interactive re-auth
+    throw new Error(`Token acquisition failed: ${error.message}. Run: node msal-auth.mjs`);
+  }
 }
 
 // ============ GRAPH API ============
