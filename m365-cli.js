@@ -181,6 +181,7 @@ function formatCalendarEvents(events) {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
+      timeZone: 'America/Chicago',
     });
     
     if (dateStr !== currentDate) {
@@ -192,7 +193,7 @@ function formatCalendarEvents(events) {
     
     const timeStr = event.isAllDay
       ? 'All day'
-      : startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      : startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chicago' });
     
     lines.push(`  ${timeStr}  ${event.subject}`);
     if (event.location?.displayName) {
@@ -242,6 +243,7 @@ function formatEmails(emails) {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'America/Chicago',
     });
     
     const icon = email.isRead ? '📧' : '📩';
